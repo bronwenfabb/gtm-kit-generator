@@ -44,6 +44,13 @@ header p {
   box-sizing: border-box;
 }
 
+.form input:focus,
+.form textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
 .form textarea {
   min-height: 70px;
   resize: vertical;
@@ -59,6 +66,15 @@ header p {
   background: var(--accent);
   color: #fff;
   cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.form button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.form button:active:not(:disabled) {
+  background: var(--accent-pressed);
 }
 
 .form button:disabled {
@@ -75,7 +91,7 @@ header p {
 
 .error {
   margin-top: 16px;
-  color: #e5484d;
+  color: var(--error);
   text-align: left;
 }
 
@@ -105,8 +121,13 @@ header p {
   border: 1px solid var(--accent-border);
   border-radius: 8px;
   background: var(--accent-bg);
-  color: var(--text-h);
+  color: var(--accent-pressed);
   cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.download:hover {
+  background: var(--accent-border);
 }
 
 /* Kit results page */
@@ -136,8 +157,8 @@ header p {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border-weak);
+  border-bottom: 1px solid var(--border-weak);
   padding: 12px 0;
 }
 
@@ -198,7 +219,7 @@ header p {
 .kit-content section.collapsible {
   margin-bottom: 12px;
   scroll-margin-top: 24px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-weak);
 }
 
 .collapsible-header {

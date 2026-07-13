@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { GtmKit } from '../types'
 import { ErrorBoundary } from '../ErrorBoundary'
+import { CollapsibleSection } from '../components/CollapsibleSection'
 import { kitToMarkdown } from '../lib/markdown'
 import { KIT_STORAGE_KEY } from '../lib/storage'
 
@@ -23,12 +24,15 @@ const SECTIONS = [
   { id: 'onepager', label: 'One-pager' },
 ]
 
+const ALL_IDS = SECTIONS.map((s) => s.id)
+
 export function KitResultsPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const [stored, setStored] = useState<StoredKit | null>(
     (location.state as StoredKit | null) ?? null,
   )
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set(['positioning']))
 
   useEffect(() => {
     if (stored) return
@@ -49,6 +53,22 @@ export function KitResultsPage() {
 
   const { productName, kit } = stored
 
+  function toggleSection(id: string) {
+    setOpenIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function goToSection(id: string) {
+    setOpenIds((prev) => new Set(prev).add(id))
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
   function downloadMarkdown() {
     const md = kitToMarkdown(productName, kit)
     const blob = new Blob([md], { type: 'text/markdown' })
@@ -68,11 +88,26 @@ export function KitResultsPage() {
         </button>
         <nav>
           {SECTIONS.map((s) => (
-            <a key={s.id} href={`#${s.id}`}>
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              onClick={(e) => {
+                e.preventDefault()
+                goToSection(s.id)
+              }}
+            >
               {s.label}
             </a>
           ))}
         </nav>
+        <div className="nav-actions">
+          <button type="button" onClick={() => setOpenIds(new Set(ALL_IDS))}>
+            Expand all
+          </button>
+          <button type="button" onClick={() => setOpenIds(new Set())}>
+            Collapse all
+          </button>
+        </div>
         <button className="download" onClick={downloadMarkdown} type="button">
           Download as Markdown
         </button>
@@ -82,13 +117,21 @@ export function KitResultsPage() {
         <h1>{productName}</h1>
 
         <ErrorBoundary>
-          <section id="positioning">
-            <h2>Positioning statement</h2>
+          <CollapsibleSection
+            id="positioning"
+            title="Positioning statement"
+            open={openIds.has('positioning')}
+            onToggle={toggleSection}
+          >
             <p className="callout">{kit.positioningStatement}</p>
-          </section>
+          </CollapsibleSection>
 
-          <section id="personas">
-            <h2>Target personas</h2>
+          <CollapsibleSection
+            id="personas"
+            title="Target personas"
+            open={openIds.has('personas')}
+            onToggle={toggleSection}
+          >
             <div className="table-wrap">
               <table>
                 <thead>
@@ -124,10 +167,14 @@ export function KitResultsPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <section id="messaging">
-            <h2>Messaging pillars</h2>
+          <CollapsibleSection
+            id="messaging"
+            title="Messaging pillars"
+            open={openIds.has('messaging')}
+            onToggle={toggleSection}
+          >
             <div className="table-wrap">
               <table>
                 <thead>
@@ -154,10 +201,14 @@ export function KitResultsPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <section id="competitive">
-            <h2>Competitive positioning</h2>
+          <CollapsibleSection
+            id="competitive"
+            title="Competitive positioning"
+            open={openIds.has('competitive')}
+            onToggle={toggleSection}
+          >
             <div className="table-wrap">
               <table>
                 <thead>
@@ -178,10 +229,14 @@ export function KitResultsPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <section id="pricing">
-            <h2>Pricing talking points</h2>
+          <CollapsibleSection
+            id="pricing"
+            title="Pricing talking points"
+            open={openIds.has('pricing')}
+            onToggle={toggleSection}
+          >
             <div className="table-wrap">
               <table>
                 <tbody>
@@ -193,10 +248,14 @@ export function KitResultsPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <section id="checklist">
-            <h2>Launch checklist</h2>
+          <CollapsibleSection
+            id="checklist"
+            title="Launch checklist"
+            open={openIds.has('checklist')}
+            onToggle={toggleSection}
+          >
             <div className="table-wrap">
               <table>
                 <thead>
@@ -221,10 +280,14 @@ export function KitResultsPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <section id="timeline">
-            <h2>Launch timeline</h2>
+          <CollapsibleSection
+            id="timeline"
+            title="Launch timeline"
+            open={openIds.has('timeline')}
+            onToggle={toggleSection}
+          >
             <div className="table-wrap">
               <table>
                 <thead>
@@ -243,18 +306,26 @@ export function KitResultsPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <section id="email">
-            <h2>Announcement email</h2>
+          <CollapsibleSection
+            id="email"
+            title="Announcement email"
+            open={openIds.has('email')}
+            onToggle={toggleSection}
+          >
             <div className="card">
               <p><strong>Subject:</strong> {kit.announcementEmail?.subject}</p>
               <p className="pre">{kit.announcementEmail?.body}</p>
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <section id="social">
-            <h2>Social posts</h2>
+          <CollapsibleSection
+            id="social"
+            title="Social posts"
+            open={openIds.has('social')}
+            onToggle={toggleSection}
+          >
             <div className="table-wrap">
               <table>
                 <thead>
@@ -273,12 +344,16 @@ export function KitResultsPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </CollapsibleSection>
 
-          <section id="onepager">
-            <h2>One-pager</h2>
+          <CollapsibleSection
+            id="onepager"
+            title="One-pager"
+            open={openIds.has('onepager')}
+            onToggle={toggleSection}
+          >
             <p className="pre">{kit.onePager}</p>
-          </section>
+          </CollapsibleSection>
         </ErrorBoundary>
       </main>
     </div>

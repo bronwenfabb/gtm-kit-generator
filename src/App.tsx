@@ -147,6 +147,12 @@ function App() {
         <button type="submit" disabled={loading}>
           {loading ? 'Generating…' : 'Generate GTM kit'}
         </button>
+        {loading && (
+          <p className="hint">
+            Writing your full kit — positioning, personas, messaging, launch copy, and more.
+            This usually takes 30–60 seconds, please don't close this tab.
+          </p>
+        )}
       </form>
 
       {error && <p className="error">{error}</p>}

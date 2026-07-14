@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import type { GtmKit } from '../types'
 import { ErrorBoundary } from '../ErrorBoundary'
 import { CollapsibleSection } from '../components/CollapsibleSection'
+import { EditableText } from '../components/EditableText'
 import { kitToMarkdown } from '../lib/markdown'
 import { KIT_STORAGE_KEY } from '../lib/storage'
 
@@ -29,29 +30,39 @@ const ALL_IDS = SECTIONS.map((s) => s.id)
 export function KitResultsPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [stored, setStored] = useState<StoredKit | null>(
-    (location.state as StoredKit | null) ?? null,
-  )
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set(['positioning']))
-
-  useEffect(() => {
-    if (stored) return
+  const [stored, setStored] = useState<StoredKit | null>(() => {
     const raw = sessionStorage.getItem(KIT_STORAGE_KEY)
     if (raw) {
       try {
-        setStored(JSON.parse(raw) as StoredKit)
-        return
+        return JSON.parse(raw) as StoredKit
       } catch {
-        // fall through to redirect
+        // fall through
       }
     }
-    navigate('/', { replace: true })
+    return (location.state as StoredKit | null) ?? null
+  })
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set(['positioning']))
+  const [slackStatus, setSlackStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [slackError, setSlackError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!stored) navigate('/', { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!stored) return null
 
   const { productName, kit } = stored
+
+  function updateKit(mutate: (kit: GtmKit) => void) {
+    setStored((prev) => {
+      if (!prev) return prev
+      const next = structuredClone(prev)
+      mutate(next.kit)
+      sessionStorage.setItem(KIT_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
+  }
 
   function toggleSection(id: string) {
     setOpenIds((prev) => {
@@ -78,6 +89,30 @@ export function KitResultsPage() {
     a.download = `${productName.replace(/\s+/g, '-').toLowerCase() || 'gtm-kit'}.md`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  async function shareToSlack() {
+    setSlackStatus('sending')
+    setSlackError(null)
+    try {
+      const res = await fetch('/api/share-slack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productName,
+          positioningStatement: kit.positioningStatement,
+          pillars: (kit.messagingPillars ?? []).map((m) => m.pillar),
+          launchDate: (kit.launchTimeline ?? []).at(-1)?.timeframe ?? '',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to share to Slack')
+      setSlackStatus('sent')
+      setTimeout(() => setSlackStatus('idle'), 4000)
+    } catch (err) {
+      setSlackStatus('error')
+      setSlackError(err instanceof Error ? err.message : 'Failed to share to Slack')
+    }
   }
 
   return (
@@ -111,10 +146,36 @@ export function KitResultsPage() {
         <button className="download" onClick={downloadMarkdown} type="button">
           Download as Markdown
         </button>
+        <button
+          className="download"
+          onClick={shareToSlack}
+          type="button"
+          disabled={slackStatus === 'sending'}
+        >
+          {slackStatus === 'sending'
+            ? 'Sharing…'
+            : slackStatus === 'sent'
+              ? 'Shared ✓'
+              : 'Share to Slack'}
+        </button>
+        {slackStatus === 'error' && slackError && <p className="error small">{slackError}</p>}
+        <p className="edit-hint">Click any text in the kit to edit it. Changes save automatically.</p>
       </aside>
 
       <main className="kit-content">
-        <h1>{productName}</h1>
+        <h1>
+          <EditableText
+            value={productName}
+            onSave={(v) =>
+              setStored((prev) => {
+                if (!prev) return prev
+                const next = { ...prev, productName: v }
+                sessionStorage.setItem(KIT_STORAGE_KEY, JSON.stringify(next))
+                return next
+              })
+            }
+          />
+        </h1>
 
         <ErrorBoundary>
           <CollapsibleSection
@@ -123,7 +184,13 @@ export function KitResultsPage() {
             open={openIds.has('positioning')}
             onToggle={toggleSection}
           >
-            <p className="callout">{kit.positioningStatement}</p>
+            <p className="callout">
+              <EditableText
+                multiline
+                value={kit.positioningStatement}
+                onSave={(v) => updateKit((k) => (k.positioningStatement = v))}
+              />
+            </p>
           </CollapsibleSection>
 
           <CollapsibleSection
@@ -145,20 +212,42 @@ export function KitResultsPage() {
                   {(kit.personas ?? []).map((p, i) => (
                     <tr key={i}>
                       <td>
-                        <strong>{p.name}</strong>
-                        <div className="muted">{p.role}</div>
+                        <strong>
+                          <EditableText
+                            value={p.name}
+                            onSave={(v) => updateKit((k) => (k.personas[i].name = v))}
+                          />
+                        </strong>
+                        <div className="muted">
+                          <EditableText
+                            value={p.role}
+                            onSave={(v) => updateKit((k) => (k.personas[i].role = v))}
+                          />
+                        </div>
                       </td>
                       <td>
                         <ul>
                           {(p.painPoints ?? []).map((pp, j) => (
-                            <li key={j}>{pp}</li>
+                            <li key={j}>
+                              <EditableText
+                                multiline
+                                value={pp}
+                                onSave={(v) => updateKit((k) => (k.personas[i].painPoints[j] = v))}
+                              />
+                            </li>
                           ))}
                         </ul>
                       </td>
                       <td>
                         <ul>
                           {(p.goals ?? []).map((g, j) => (
-                            <li key={j}>{g}</li>
+                            <li key={j}>
+                              <EditableText
+                                multiline
+                                value={g}
+                                onSave={(v) => updateKit((k) => (k.personas[i].goals[j] = v))}
+                              />
+                            </li>
                           ))}
                         </ul>
                       </td>
@@ -187,12 +276,33 @@ export function KitResultsPage() {
                 <tbody>
                   {(kit.messagingPillars ?? []).map((m, i) => (
                     <tr key={i}>
-                      <td><strong>{m.pillar}</strong></td>
-                      <td>{m.description}</td>
+                      <td>
+                        <strong>
+                          <EditableText
+                            value={m.pillar}
+                            onSave={(v) => updateKit((k) => (k.messagingPillars[i].pillar = v))}
+                          />
+                        </strong>
+                      </td>
+                      <td>
+                        <EditableText
+                          multiline
+                          value={m.description}
+                          onSave={(v) => updateKit((k) => (k.messagingPillars[i].description = v))}
+                        />
+                      </td>
                       <td>
                         <ul>
                           {(m.proofPoints ?? []).map((pp, j) => (
-                            <li key={j}>{pp}</li>
+                            <li key={j}>
+                              <EditableText
+                                multiline
+                                value={pp}
+                                onSave={(v) =>
+                                  updateKit((k) => (k.messagingPillars[i].proofPoints[j] = v))
+                                }
+                              />
+                            </li>
                           ))}
                         </ul>
                       </td>
@@ -221,9 +331,30 @@ export function KitResultsPage() {
                 <tbody>
                   {(kit.competitiveNotes ?? []).map((c, i) => (
                     <tr key={i}>
-                      <td><strong>{c.competitor}</strong></td>
-                      <td>{c.theirPositioning}</td>
-                      <td>{c.ourAngle}</td>
+                      <td>
+                        <strong>
+                          <EditableText
+                            value={c.competitor}
+                            onSave={(v) => updateKit((k) => (k.competitiveNotes[i].competitor = v))}
+                          />
+                        </strong>
+                      </td>
+                      <td>
+                        <EditableText
+                          multiline
+                          value={c.theirPositioning}
+                          onSave={(v) =>
+                            updateKit((k) => (k.competitiveNotes[i].theirPositioning = v))
+                          }
+                        />
+                      </td>
+                      <td>
+                        <EditableText
+                          multiline
+                          value={c.ourAngle}
+                          onSave={(v) => updateKit((k) => (k.competitiveNotes[i].ourAngle = v))}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -242,7 +373,13 @@ export function KitResultsPage() {
                 <tbody>
                   {(kit.pricingTalkingPoints ?? []).map((pt, i) => (
                     <tr key={i}>
-                      <td>{pt}</td>
+                      <td>
+                        <EditableText
+                          multiline
+                          value={pt}
+                          onSave={(v) => updateKit((k) => (k.pricingTalkingPoints[i] = v))}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -267,11 +404,24 @@ export function KitResultsPage() {
                 <tbody>
                   {(kit.launchChecklist ?? []).map((c, i) => (
                     <tr key={i}>
-                      <td><strong>{c.phase}</strong></td>
+                      <td>
+                        <strong>
+                          <EditableText
+                            value={c.phase}
+                            onSave={(v) => updateKit((k) => (k.launchChecklist[i].phase = v))}
+                          />
+                        </strong>
+                      </td>
                       <td>
                         <ul>
                           {(c.tasks ?? []).map((t, j) => (
-                            <li key={j}>{t}</li>
+                            <li key={j}>
+                              <EditableText
+                                multiline
+                                value={t}
+                                onSave={(v) => updateKit((k) => (k.launchChecklist[i].tasks[j] = v))}
+                              />
+                            </li>
                           ))}
                         </ul>
                       </td>
@@ -299,8 +449,21 @@ export function KitResultsPage() {
                 <tbody>
                   {(kit.launchTimeline ?? []).map((t, i) => (
                     <tr key={i}>
-                      <td><strong>{t.timeframe}</strong></td>
-                      <td>{t.milestone}</td>
+                      <td>
+                        <strong>
+                          <EditableText
+                            value={t.timeframe}
+                            onSave={(v) => updateKit((k) => (k.launchTimeline[i].timeframe = v))}
+                          />
+                        </strong>
+                      </td>
+                      <td>
+                        <EditableText
+                          multiline
+                          value={t.milestone}
+                          onSave={(v) => updateKit((k) => (k.launchTimeline[i].milestone = v))}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -315,8 +478,20 @@ export function KitResultsPage() {
             onToggle={toggleSection}
           >
             <div className="card">
-              <p><strong>Subject:</strong> {kit.announcementEmail?.subject}</p>
-              <p className="pre">{kit.announcementEmail?.body}</p>
+              <p>
+                <strong>Subject:</strong>{' '}
+                <EditableText
+                  value={kit.announcementEmail?.subject ?? ''}
+                  onSave={(v) => updateKit((k) => (k.announcementEmail.subject = v))}
+                />
+              </p>
+              <p className="pre">
+                <EditableText
+                  multiline
+                  value={kit.announcementEmail?.body ?? ''}
+                  onSave={(v) => updateKit((k) => (k.announcementEmail.body = v))}
+                />
+              </p>
             </div>
           </CollapsibleSection>
 
@@ -337,8 +512,21 @@ export function KitResultsPage() {
                 <tbody>
                   {(kit.socialPosts ?? []).map((s, i) => (
                     <tr key={i}>
-                      <td><strong>{s.platform}</strong></td>
-                      <td className="pre">{s.text}</td>
+                      <td>
+                        <strong>
+                          <EditableText
+                            value={s.platform}
+                            onSave={(v) => updateKit((k) => (k.socialPosts[i].platform = v))}
+                          />
+                        </strong>
+                      </td>
+                      <td className="pre">
+                        <EditableText
+                          multiline
+                          value={s.text}
+                          onSave={(v) => updateKit((k) => (k.socialPosts[i].text = v))}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -352,9 +540,21 @@ export function KitResultsPage() {
             open={openIds.has('onepager')}
             onToggle={toggleSection}
           >
-            <p className="pre">{kit.onePager}</p>
+            <p className="pre">
+              <EditableText
+                multiline
+                value={kit.onePager}
+                onSave={(v) => updateKit((k) => (k.onePager = v))}
+              />
+            </p>
           </CollapsibleSection>
         </ErrorBoundary>
+
+        <div className="next-step">
+          <button type="button" className="next-cta" onClick={() => navigate('/collateral')}>
+            Next — generate marketing collateral →
+          </button>
+        </div>
       </main>
     </div>
   )

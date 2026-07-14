@@ -44,6 +44,24 @@ export interface SocialPost {
   text: string
 }
 
+export interface CollateralFormat {
+  name: string
+  dimensions: string
+}
+
+export interface CollateralBrief {
+  type: string
+  title: string
+  formats: CollateralFormat[]
+  headline: string
+  subcopy: string
+  cta: string
+  visualDirection: string
+  brandNotes: string
+  canvaKeywords: string[]
+  imagePrompt: string
+}
+
 export interface GtmKit {
   positioningStatement: string
   personas: Persona[]

@@ -15,6 +15,21 @@ const EMPTY_INPUTS: LaunchInputs = {
   tone: '',
 }
 
+const DEMO_INPUTS: LaunchInputs = {
+  productName: 'ShiftReady',
+  oneLiner: 'Digital pre-start checks and shift handovers for frontline teams',
+  targetAudience:
+    'Operations and HSE managers at mid-market industrial companies (manufacturing, logistics, construction) with 200-5,000 frontline workers across multiple sites',
+  keyFeatures:
+    'Mobile-first inspection checklists with photo capture, automated shift handover reports, real-time issue escalation to supervisors, offline mode for low-connectivity sites, analytics dashboard showing completion rates and recurring hazards by site',
+  problemSolved:
+    'Paper-based pre-start checks get skipped or pencil-whipped, and critical issues raised at the end of one shift never reach the next crew — leading to equipment damage, near-misses, and compliance gaps that only surface during audits',
+  competitors: 'SafetyCulture (iAuditor), UpKeep, Lumiform',
+  pricingModel: 'Per-seat, $24/user/month billed annually, volume discounts above 500 seats, free 30-day pilot for one site',
+  launchDate: 'October 2026',
+  tone: 'Confident and practical, plain English, respects the intelligence of frontline workers — no corporate jargon',
+}
+
 export function LaunchFormPage() {
   const navigate = useNavigate()
   const [inputs, setInputs] = useState<LaunchInputs>(EMPTY_INPUTS)
@@ -58,6 +73,14 @@ export function LaunchFormPage() {
       </header>
 
       <form onSubmit={handleSubmit} className="form">
+        <button
+          type="button"
+          className="demo-fill"
+          onClick={() => setInputs(DEMO_INPUTS)}
+          disabled={loading}
+        >
+          Fill with demo data
+        </button>
         <label>
           Product name *
           <input

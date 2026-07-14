@@ -82,6 +82,21 @@ header p {
   cursor: not-allowed;
 }
 
+.form button.demo-fill {
+  align-self: flex-end;
+  margin-top: 0;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  background: none;
+  border: 1px solid var(--accent-border);
+  color: var(--accent-pressed);
+}
+
+.form button.demo-fill:hover:not(:disabled) {
+  background: var(--accent-bg);
+}
+
 .hint {
   font-size: 13px;
   color: var(--text);
